@@ -48,7 +48,7 @@ function App() {
                 alt={paintingData.title}
                 
               />
-              <p>{paintingData.artistDisplayName}</p>
+              <p>{paintingData.culture} Created by: {paintingData.artistDisplayName} {paintingData.DisplayBio} {paintingData.period} {paintingData.medium}</p>
             </div>
 
             <div className="cropped">
