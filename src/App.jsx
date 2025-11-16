@@ -11,25 +11,30 @@ import Groq from "groq-sdk";
 import { GiMagnifyingGlass } from "react-icons/gi";
 import Navbar from "./components/hamburger.jsx";
 
+import "dotenv/config";
+import { GoogleGenAI } from "@google/genai";
+console.log(process.env.GEMINI_API_KEY);
 
-const ai = new Groq({
-  apiKey: "",
-  dangerouslyAllowBrowser: true,
-});
+const ai = new GoogleGenAI({});
+
+async function main() {
+  console.log(response.text);
+}
 
 async function description(input) {
-  const response = await ai.chat.completions.create({
-    messages: [
-      {
-        role: "user",
-        content:
-          input +
-          "Write 3 paragraphs about this painting, do deep research, search on the interet. first paragrph must be ths story the painting is trying to convey, the 2nd can be story or aomethin elsse, 3rd can be ABOUT the artt itself, write proffesionally like a blog post, dont use AI Like words, write simple but good",
-      },
-    ],
-    model: "llama-3.3-70b-versatile",
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: `
+${input}
+Write 3 paragraphs about this painting. Do deep research, search on the internet.
+The first paragraph should describe the story the painting conveys.
+The second paragraph can expand on the historical or narrative context.
+The third paragraph should discuss the art itself—composition, technique, and style.
+Write professionally, like a blog post. Avoid AI-like phrasing and keep the writing simple but refined.
+`,
   });
-  return response.choices[0].message.content;
+
+  return response.text();
 }
 
 async function getRandomPainting() {
@@ -87,7 +92,7 @@ function App() {
       {paintingData ? (
         <>
           <h1 className="logo">ARS ANTIQUA</h1>
-          <Navbar/> 
+          <Navbar />
           <main>
             <div className="full-painting-wrapper">
               <div className="title-desc-wrapper">
@@ -103,30 +108,30 @@ function App() {
               </div>
               <img src={paintingData.primaryImage} alt={paintingData.title} />
               <div className="info-panel">
-             {paintingData.culture && (
-  <div className="info-section">
-    <GrMapLocation color="#b8996b" /> {paintingData.culture}
-  </div>
-)}
+                {paintingData.culture && (
+                  <div className="info-section">
+                    <GrMapLocation color="#b8996b" /> {paintingData.culture}
+                  </div>
+                )}
 
-{paintingData.artistDisplayName && (
-  <div className="info-section">
-    <IoPersonOutline color="#b8996b" /> {paintingData.artistDisplayName}
-  </div>
-)}
+                {paintingData.artistDisplayName && (
+                  <div className="info-section">
+                    <IoPersonOutline color="#b8996b" />{" "}
+                    {paintingData.artistDisplayName}
+                  </div>
+                )}
 
-{paintingData.period && (
-  <div className="info-section">
-    <MdOutlineDateRange color="#b8996b" /> {paintingData.period}
-  </div>
-)}
+                {paintingData.period && (
+                  <div className="info-section">
+                    <MdOutlineDateRange color="#b8996b" /> {paintingData.period}
+                  </div>
+                )}
 
-{paintingData.medium && (
-  <div className="info-section">
-    <GiLargePaintBrush color="#b8996b" /> {paintingData.medium}
-  </div>
-)}
-
+                {paintingData.medium && (
+                  <div className="info-section">
+                    <GiLargePaintBrush color="#b8996b" /> {paintingData.medium}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -172,7 +177,10 @@ function App() {
               <p>{paintingText ? paintingText[2] : ""}</p>
             </div>
 
-            <p>Made with love by tachi, check out the sidebar to know more about this project and to contact me</p>
+            <p>
+              Made with love by tachi, check out the sidebar to know more about
+              this project and to contact me
+            </p>
           </main>
         </>
       ) : (
