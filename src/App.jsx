@@ -11,9 +11,8 @@ import Groq from "groq-sdk";
 import { GiMagnifyingGlass } from "react-icons/gi";
 import Navbar from "./components/hamburger.jsx";
 
-import "dotenv/config";
+
 import { GoogleGenAI } from "@google/genai";
-console.log(process.env.GEMINI_API_KEY);
 
 const ai = new GoogleGenAI({});
 
@@ -22,70 +21,115 @@ async function main() {
 }
 
 async function description(input) {
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: `
-${input}
-Write 3 paragraphs about this painting. Do deep research, search on the internet.
-The first paragraph should describe the story the painting conveys.
-The second paragraph can expand on the historical or narrative context.
-The third paragraph should discuss the art itself—composition, technique, and style.
-Write professionally, like a blog post. Avoid AI-like phrasing and keep the writing simple but refined.
-`,
-  });
+  try {
+    console.log("Starting Gemini request...");
+    console.log("Input:", input);
 
-  return response.text();
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `
+${input}
+Write 3 paragraphs about this painting.
+`,
+    });
+
+    console.log("Gemini raw response:", response);
+
+    const text = response.text;
+
+    console.log("Gemini text:", text);
+
+    return text;
+  } catch (err) {
+    console.error("Gemini ERROR:", err);
+    return "Failed to generate description";
+  }
 }
 
 async function getRandomPainting() {
-  const randomIndex = Math.floor(Math.random() * list.length);
-  const randomPaintingID = list[randomIndex];
-  const resImg = await fetch(
-    `https://collectionapi.metmuseum.org/public/collection/v1/objects/${randomPaintingID}`
-  );
-  const IMGData = await resImg.json();
-  const response = await fetch("http://127.0.0.1:5000/run-script", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ imageUrl: IMGData.primaryImage }),
-  });
-  const saliencydata = await response.json();
+  console.log("Choosing random painting...");
 
-  return { imgdata: IMGData, saliancy: saliencydata };
+  let IMGData;
+
+  do {
+    const randomIndex = Math.floor(Math.random() * list.length);
+
+    const randomPaintingID = list[randomIndex];
+
+    const resImg = await fetch(
+      `https://collectionapi.metmuseum.org/public/collection/v1/objects/${randomPaintingID}`
+    );
+
+    IMGData = await resImg.json();
+  } while (!IMGData.primaryImage);
+
+  return IMGData;
+}
+
+async function getSaliency(imageUrl) {
+  try {
+    const response = await fetch("http://127.0.0.1:5000/run-script", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageUrl }),
+    });
+
+    const data = await response.json();
+
+    return data.result;
+  } catch (err) {
+    console.error("Saliency ERROR:", err);
+    return null;
+  }
 }
 
 function App() {
   const [paintingData, setPaintingData] = useState(null);
   const [paintingText, setPaintingText] = useState(null);
   const [croppedImages, setCroppedImages] = useState(null);
+  const [loadingPainting, setLoadingPainting] = useState(false);
+const [loadingSaliency, setLoadingSaliency] = useState(false);
+const [loadingText, setLoadingText] = useState(false);
 
-  useEffect(() => {
-    async function fetchPainting() {
-      try {
-        let returned;
+ async function loadArtwork() {
+  try {
+    setLoadingPainting(true);
+    setLoadingSaliency(true);
+    setLoadingText(true);
 
-        do {
-          returned = await getRandomPainting();
-        } while (
-          !returned.imgdata.primaryImage ||
-          returned.imgdata.primaryImage === ""
-        );
+    setPaintingData(null);
+    setPaintingText(null);
+    setCroppedImages(null);
 
-        setPaintingData(returned.imgdata);
-        setCroppedImages(returned.saliancy.result);
+    const artwork = await getRandomPainting();
 
-        const text = await description(
-          returned.imgdata.title + " " + returned.imgdata.artistDisplayName
-        );
-        const paragraphs = text.split("\n\n");
-        setPaintingText(paragraphs);
-      } catch (err) {
-        console.error("Error fetching painting or description:", err);
-      }
-    }
+    console.log("Artwork fetched");
 
-    fetchPainting();
-  }, []);
+    setPaintingData(artwork);
+
+    setLoadingPainting(false);
+
+    getSaliency(artwork.primaryImage).then((images) => {
+      setCroppedImages(images);
+      setLoadingSaliency(false);
+    });
+
+    description(
+      artwork.title + " " + artwork.artistDisplayName
+    ).then((text) => {
+      const paragraphs = text.split("\n\n");
+      setPaintingText(paragraphs);
+      setLoadingText(false);
+    });
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+useEffect(() => {
+  loadArtwork();
+}, []);
 
   return (
     <>
@@ -93,6 +137,7 @@ function App() {
         <>
           <h1 className="logo">ARS ANTIQUA</h1>
           <Navbar />
+          
           <main>
             <div className="full-painting-wrapper">
               <div className="title-desc-wrapper">
@@ -134,7 +179,9 @@ function App() {
                 )}
               </div>
             </div>
-
+            <button className="new-art-btn" onClick={loadArtwork}>
+  New Artwork
+</button>
             <div className="detailed-segments">
               <hr />
               <div className="detailed-segments-text">
@@ -148,34 +195,60 @@ function App() {
             </div>
 
             <div className="cropped">
-              {croppedImages && (
-                <img
-                  src={`data:image/png;base64,${croppedImages[0]}`}
-                  alt="Processed"
-                />
-              )}
-              <p>{paintingText ? paintingText[0] : ""}</p>
-            </div>
+  {loadingSaliency ? (
+    <div className="placeholder-img">Loading image segment...</div>
+  ) : (
+    croppedImages && (
+      <img
+        src={`data:image/png;base64,${croppedImages[0]}`}
+        alt="Processed"
+      />
+    )
+  )}
+
+  <p>
+    {loadingText
+      ? "Generating analysis..."
+      : paintingText?.[0]}
+  </p>
+</div>
 
             <div className="cropped">
-              <p>{paintingText ? paintingText[1] : ""}</p>
-              {croppedImages && (
-                <img
-                  src={`data:image/png;base64,${croppedImages[1]}`}
-                  alt="Processed"
-                />
-              )}
-            </div>
+  <p>
+    {loadingText
+      ? "Researching historical context..."
+      : paintingText?.[1]}
+  </p>
 
+  {loadingSaliency ? (
+    <div className="placeholder-img">Loading image segment...</div>
+  ) : (
+    croppedImages && (
+      <img
+        src={`data:image/png;base64,${croppedImages[1]}`}
+        alt="Processed"
+      />
+    )
+  )}
+</div>
             <div className="cropped">
-              {croppedImages && (
-                <img
-                  src={`data:image/png;base64,${croppedImages[2]}`}
-                  alt="Processed"
-                />
-              )}
-              <p>{paintingText ? paintingText[2] : ""}</p>
-            </div>
+  {loadingSaliency ? (
+    <div className="placeholder-img">Loading image segment...</div>
+  ) : (
+    croppedImages && (
+      <img
+        src={`data:image/png;base64,${croppedImages[2]}`}
+        alt="Processed"
+      />
+    )
+  )}
+
+  <p>
+    {loadingText
+      ? "Analyzing composition and style..."
+      : paintingText?.[2]}
+  </p>
+</div>
 
             <p>
               Made with love by tachi, check out the sidebar to know more about
