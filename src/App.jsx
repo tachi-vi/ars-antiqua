@@ -10,11 +10,15 @@ import list from "./apis/met.js";
 import Groq from "groq-sdk";
 import { GiMagnifyingGlass } from "react-icons/gi";
 import Navbar from "./components/hamburger.jsx";
-
-
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({});
+console.log(import.meta.env);
+console.log(import.meta.env.VITE_GEMINI_API_KEY);
+console.log(import.meta.env.GEMINI);
+
+const ai = new GoogleGenAI({apiKey: import.meta.env.VITE_GEMINI_API_KEY});
+
+
 
 async function main() {
   console.log(response.text);
